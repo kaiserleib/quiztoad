@@ -77,9 +77,6 @@ export function Dashboard() {
                   <div className="event-info">
                     <span className="event-title">{event.title}</span>
                     <span className="event-date">{formatDate(event.date)}</span>
-                    <span className={`event-status status-${event.status}`}>
-                      {event.status}
-                    </span>
                   </div>
                   <div className="event-actions">
                     <button onClick={() => navigate(`/events/${event.id}/edit`)}>
