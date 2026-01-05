@@ -29,6 +29,7 @@ export function Presentation() {
   const [currentSlide, setCurrentSlide] = useState(0)
   const [loading, setLoading] = useState(true)
   const [reviewingRound, setReviewingRound] = useState<number | null>(null)
+  const [answerRevealed, setAnswerRevealed] = useState(false)
 
   useEffect(() => {
     const loadEvent = async (eventId: string) => {
@@ -124,14 +125,24 @@ export function Presentation() {
   }, [id, navigate])
 
   const nextSlide = useCallback(() => {
+    const current = slides[currentSlide]
+
+    // In review mode on a question, reveal answer first before advancing
+    if (reviewingRound !== null && current?.type === 'question' && !answerRevealed) {
+      setAnswerRevealed(true)
+      return
+    }
+
     if (currentSlide < slides.length - 1) {
       setCurrentSlide(currentSlide + 1)
+      setAnswerRevealed(false)
     }
-  }, [currentSlide, slides.length])
+  }, [currentSlide, slides, reviewingRound, answerRevealed])
 
   const prevSlide = useCallback(() => {
     if (currentSlide > 0) {
       setCurrentSlide(currentSlide - 1)
+      setAnswerRevealed(false)
     }
   }, [currentSlide])
 
@@ -140,6 +151,7 @@ export function Presentation() {
     if (round) {
       setCurrentSlide(round.startIndex)
       setReviewingRound(null)
+      setAnswerRevealed(false)
     }
   }, [rounds])
 
@@ -149,6 +161,7 @@ export function Presentation() {
       // Go to first question of the round (skip the intro slide)
       setCurrentSlide(round.startIndex + 1)
       setReviewingRound(roundNumber)
+      setAnswerRevealed(false)
     }
   }, [rounds])
 
@@ -181,7 +194,8 @@ export function Presentation() {
   }
 
   const slide = slides[currentSlide]
-  const showAnswer = reviewingRound !== null && slide?.roundNumber === reviewingRound
+  const inReviewMode = reviewingRound !== null && slide?.roundNumber === reviewingRound
+  const showAnswer = inReviewMode && answerRevealed
 
   return (
     <div className="presentation" onClick={nextSlide}>
@@ -238,7 +252,7 @@ export function Presentation() {
         <div className="slide slide-question">
           <p className="question-label">
             Round {slide.roundNumber} · Question {slide.questionNumber}
-            {reviewingRound && ' · Review'}
+            {inReviewMode && ' · Review'}
           </p>
           <div className="question-text">{slide.questionText}</div>
           {showAnswer && (
