@@ -25,6 +25,7 @@ export function EventEditor() {
   const [showRoundPicker, setShowRoundPicker] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
 
   const persistRoundToEvent = useCallback(
     async (roundId: string, position: number) => {
@@ -221,7 +222,14 @@ export function EventEditor() {
         })
       }
 
-      navigate('/')
+      // Show saved feedback
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2000)
+
+      // If we just created the event, update URL to edit mode
+      if (!id && eventId) {
+        navigate(`/events/${eventId}/edit`, { replace: true })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save event')
     } finally {
@@ -328,10 +336,11 @@ export function EventEditor() {
       )}
 
       {error && <p className="error">{error}</p>}
+      {saved && <p className="success">Saved!</p>}
 
       <div className="save-actions">
         <button onClick={handleSave} disabled={saving} className="save-btn">
-          {saving ? 'Saving...' : 'Save Trivia Night'}
+          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Trivia Night'}
         </button>
       </div>
     </div>

@@ -789,6 +789,11 @@ body {
   margin-bottom: 1rem;
 }
 
+.event-editor .success {
+  color: #4ade80;
+  margin-bottom: 1rem;
+}
+
 .event-editor .save-actions {
   display: flex;
   justify-content: flex-end;
