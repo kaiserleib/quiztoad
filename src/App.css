@@ -336,6 +336,68 @@ body {
   font-size: 1.25rem;
 }
 
+.editor-mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.editor-mode-toggle button {
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid #444;
+  color: #888;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.editor-mode-toggle button.active {
+  background: #333;
+  color: #fff;
+  border-color: #666;
+}
+
+.markdown-editor {
+  margin-bottom: 2rem;
+}
+
+.markdown-help {
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.markdown-help code {
+  background: #333;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.8rem;
+}
+
+.markdown-editor textarea {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  background: #2a2a3e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  color: #fff;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.markdown-editor textarea:focus {
+  outline: none;
+  border-color: #666;
+}
+
+.question-count {
+  font-size: 0.85rem;
+  color: #888;
+  margin-top: 0.5rem;
+}
+
 .questions-list h2 {
   margin-bottom: 1rem;
 }

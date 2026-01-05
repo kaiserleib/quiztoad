@@ -11,6 +11,8 @@ interface QuestionDraft {
   isNew?: boolean
 }
 
+type EditorMode = 'cards' | 'markdown'
+
 export function RoundEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -20,6 +22,8 @@ export function RoundEditor() {
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
   const [questions, setQuestions] = useState<QuestionDraft[]>([])
+  const [markdownText, setMarkdownText] = useState('')
+  const [editorMode, setEditorMode] = useState<EditorMode>('markdown')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -28,6 +32,13 @@ export function RoundEditor() {
       loadRound(id)
     }
   }, [id])
+
+  // Sync questions to markdown when switching modes
+  useEffect(() => {
+    if (editorMode === 'markdown' && questions.length > 0) {
+      setMarkdownText(questionsToMarkdown(questions))
+    }
+  }, [editorMode])
 
   const loadRound = async (roundId: string) => {
     const { data: round } = await supabase
@@ -47,18 +58,101 @@ export function RoundEditor() {
         .order('position')
 
       if (roundQuestions) {
-        setQuestions(
-          roundQuestions.map((rq) => {
-            const q = rq.questions as unknown as Question
-            return {
-              id: q.id,
-              text: q.text,
-              answer: q.answer,
-            }
-          })
-        )
+        const loadedQuestions = roundQuestions.map((rq) => {
+          const q = rq.questions as unknown as Question
+          return {
+            id: q.id,
+            text: q.text,
+            answer: q.answer,
+          }
+        })
+        setQuestions(loadedQuestions)
+        setMarkdownText(questionsToMarkdown(loadedQuestions))
       }
     }
+  }
+
+  const questionsToMarkdown = (qs: QuestionDraft[]): string => {
+    return qs
+      .map((q, i) => `${i + 1}. ${q.text}\nAnswer: ${q.answer}`)
+      .join('\n\n')
+  }
+
+  const parseMarkdown = (text: string): QuestionDraft[] => {
+    const lines = text.split('\n')
+    const parsed: QuestionDraft[] = []
+    let currentQuestion: { text: string; answer: string } | null = null
+    let questionLines: string[] = []
+
+    for (const line of lines) {
+      const trimmed = line.trim()
+
+      // Check if this is an answer line
+      if (trimmed.toLowerCase().startsWith('answer:')) {
+        if (currentQuestion || questionLines.length > 0) {
+          const answer = trimmed.substring(7).trim()
+          const questionText = questionLines.join('\n').trim()
+          if (questionText) {
+            parsed.push({
+              text: questionText,
+              answer: answer,
+              isNew: true,
+            })
+          }
+          questionLines = []
+          currentQuestion = null
+        }
+        continue
+      }
+
+      // Check if this starts a new numbered question
+      const numberMatch = trimmed.match(/^(\d+)\.\s*(.*)/)
+      if (numberMatch) {
+        // Save previous question if exists without answer
+        if (questionLines.length > 0) {
+          const questionText = questionLines.join('\n').trim()
+          if (questionText) {
+            parsed.push({
+              text: questionText,
+              answer: '',
+              isNew: true,
+            })
+          }
+        }
+        questionLines = [numberMatch[2]]
+        continue
+      }
+
+      // Continue current question
+      if (trimmed || questionLines.length > 0) {
+        questionLines.push(trimmed)
+      }
+    }
+
+    // Handle last question if no answer
+    if (questionLines.length > 0) {
+      const questionText = questionLines.join('\n').trim()
+      if (questionText) {
+        parsed.push({
+          text: questionText,
+          answer: '',
+          isNew: true,
+        })
+      }
+    }
+
+    return parsed
+  }
+
+  const switchToCards = () => {
+    const parsed = parseMarkdown(markdownText)
+    setQuestions(parsed)
+    setEditorMode('cards')
+  }
+
+  const switchToMarkdown = () => {
+    setMarkdownText(questionsToMarkdown(questions))
+    setEditorMode('markdown')
   }
 
   const addQuestion = () => {
@@ -90,17 +184,23 @@ export function RoundEditor() {
   }
 
   const handleSave = async () => {
+    // Parse markdown if in markdown mode
+    let questionsToSave = questions
+    if (editorMode === 'markdown') {
+      questionsToSave = parseMarkdown(markdownText)
+    }
+
     if (!title.trim()) {
       setError('Round title is required')
       return
     }
 
-    if (questions.length === 0) {
+    if (questionsToSave.length === 0) {
       setError('Add at least one question')
       return
     }
 
-    for (const q of questions) {
+    for (const q of questionsToSave) {
       if (!q.text.trim() || !q.answer.trim()) {
         setError('All questions must have text and an answer')
         return
@@ -133,8 +233,8 @@ export function RoundEditor() {
       }
 
       // Create/update questions and link to round
-      for (let i = 0; i < questions.length; i++) {
-        const q = questions[i]
+      for (let i = 0; i < questionsToSave.length; i++) {
+        const q = questionsToSave[i]
         let questionId = q.id
 
         if (q.isNew || !q.id) {
@@ -173,6 +273,10 @@ export function RoundEditor() {
     }
   }
 
+  const questionCount = editorMode === 'markdown'
+    ? parseMarkdown(markdownText).length
+    : questions.length
+
   return (
     <div className="round-editor">
       <header>
@@ -199,47 +303,81 @@ export function RoundEditor() {
         />
       </div>
 
-      <div className="questions-list">
-        <h2>Questions ({questions.length})</h2>
-
-        {questions.map((q, index) => (
-          <div key={index} className="question-card">
-            <div className="question-header">
-              <span className="question-number">Q{index + 1}</span>
-              <div className="question-actions">
-                <button onClick={() => moveQuestion(index, 'up')} disabled={index === 0}>
-                  ↑
-                </button>
-                <button
-                  onClick={() => moveQuestion(index, 'down')}
-                  disabled={index === questions.length - 1}
-                >
-                  ↓
-                </button>
-                <button onClick={() => removeQuestion(index)} className="remove-btn">
-                  ×
-                </button>
-              </div>
-            </div>
-            <textarea
-              placeholder="Question text (include multiple choice options if applicable)"
-              value={q.text}
-              onChange={(e) => updateQuestion(index, 'text', e.target.value)}
-              rows={3}
-            />
-            <input
-              type="text"
-              placeholder="Answer"
-              value={q.answer}
-              onChange={(e) => updateQuestion(index, 'answer', e.target.value)}
-            />
-          </div>
-        ))}
-
-        <button onClick={addQuestion} className="add-question-btn">
-          + Add Question
+      <div className="editor-mode-toggle">
+        <button
+          className={editorMode === 'markdown' ? 'active' : ''}
+          onClick={switchToMarkdown}
+        >
+          Markdown
+        </button>
+        <button
+          className={editorMode === 'cards' ? 'active' : ''}
+          onClick={switchToCards}
+        >
+          Cards
         </button>
       </div>
+
+      {editorMode === 'markdown' ? (
+        <div className="markdown-editor">
+          <div className="markdown-help">
+            Format: <code>1. Question text? A) ... B) ... Answer: B) The answer</code>
+          </div>
+          <textarea
+            value={markdownText}
+            onChange={(e) => setMarkdownText(e.target.value)}
+            placeholder={`1. What is the capital of France?
+Answer: Paris
+
+2. Which planet is known as the Red Planet? A) Venus B) Mars C) Jupiter D) Saturn
+Answer: B) Mars`}
+            rows={20}
+          />
+          <div className="question-count">{questionCount} questions detected</div>
+        </div>
+      ) : (
+        <div className="questions-list">
+          <h2>Questions ({questions.length})</h2>
+
+          {questions.map((q, index) => (
+            <div key={index} className="question-card">
+              <div className="question-header">
+                <span className="question-number">Q{index + 1}</span>
+                <div className="question-actions">
+                  <button onClick={() => moveQuestion(index, 'up')} disabled={index === 0}>
+                    ↑
+                  </button>
+                  <button
+                    onClick={() => moveQuestion(index, 'down')}
+                    disabled={index === questions.length - 1}
+                  >
+                    ↓
+                  </button>
+                  <button onClick={() => removeQuestion(index)} className="remove-btn">
+                    ×
+                  </button>
+                </div>
+              </div>
+              <textarea
+                placeholder="Question text (include multiple choice options if applicable)"
+                value={q.text}
+                onChange={(e) => updateQuestion(index, 'text', e.target.value)}
+                rows={3}
+              />
+              <input
+                type="text"
+                placeholder="Answer"
+                value={q.answer}
+                onChange={(e) => updateQuestion(index, 'answer', e.target.value)}
+              />
+            </div>
+          ))}
+
+          <button onClick={addQuestion} className="add-question-btn">
+            + Add Question
+          </button>
+        </div>
+      )}
 
       {error && <p className="error">{error}</p>}
 
