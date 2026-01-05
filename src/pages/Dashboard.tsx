@@ -32,7 +32,8 @@ export function Dashboard() {
   }
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    // Add T12:00:00 to avoid timezone shifts (YYYY-MM-DD is parsed as UTC midnight)
+    return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',

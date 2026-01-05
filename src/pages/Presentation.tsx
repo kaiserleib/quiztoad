@@ -60,10 +60,11 @@ export function Presentation() {
       const roundList: RoundInfo[] = []
 
       // Cover slide
+      // Add T12:00:00 to avoid timezone shifts (YYYY-MM-DD is parsed as UTC midnight)
       slideList.push({
         type: 'cover',
         title: event.title,
-        date: new Date(event.date).toLocaleDateString('en-US', {
+        date: new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', {
           weekday: 'long',
           year: 'numeric',
           month: 'long',
