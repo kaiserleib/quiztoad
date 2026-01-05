@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Question, Round } from '../lib/database.types'
@@ -24,6 +24,7 @@ interface RoundInfo {
 export function Presentation() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const containerRef = useRef<HTMLDivElement>(null)
   const [slides, setSlides] = useState<SlideData[]>([])
   const [rounds, setRounds] = useState<RoundInfo[]>([])
   const [currentSlide, setCurrentSlide] = useState(0)
@@ -173,11 +174,10 @@ export function Presentation() {
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault()
         prevSlide()
-      } else if (e.key === 'Escape') {
-        navigate('/')
       }
+      // ESC is handled by fullscreenchange event
     },
-    [nextSlide, prevSlide, navigate]
+    [nextSlide, prevSlide]
   )
 
   useEffect(() => {
@@ -185,7 +185,30 @@ export function Presentation() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
+  // Enter fullscreen when presentation loads
+  useEffect(() => {
+    if (!loading && containerRef.current) {
+      containerRef.current.requestFullscreen?.().catch(() => {
+        // Fullscreen may be blocked by browser, continue without it
+      })
+    }
+  }, [loading])
+
+  // Handle exiting fullscreen (e.g., user presses ESC)
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        navigate('/')
+      }
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  }, [navigate])
+
   const exitPresentation = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.()
+    }
     navigate('/')
   }
 
@@ -216,7 +239,7 @@ export function Presentation() {
   const parsedQuestion = slide?.questionText ? parseQuestionText(slide.questionText) : null
 
   return (
-    <div className="presentation" onClick={nextSlide}>
+    <div ref={containerRef} className="presentation" onClick={nextSlide}>
       {/* Top navigation bar */}
       <div className="presentation-nav" onClick={(e) => e.stopPropagation()}>
         <div className="round-nav">
