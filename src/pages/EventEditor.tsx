@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Round } from '../lib/database.types'
@@ -14,6 +14,7 @@ interface RoundSelection {
 export function EventEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useAuth()
   const isEditing = Boolean(id)
 
@@ -31,6 +32,20 @@ export function EventEditor() {
       loadEvent(id)
     }
   }, [id])
+
+  // Handle newly created round from RoundEditor
+  useEffect(() => {
+    const addRoundId = searchParams.get('addRound')
+    if (addRoundId && availableRounds.length > 0) {
+      const roundToAdd = availableRounds.find((r) => r.id === addRoundId)
+      if (roundToAdd && !selectedRounds.find((r) => r.id === addRoundId)) {
+        setSelectedRounds((prev) => [...prev, roundToAdd])
+      }
+      // Clear the param
+      searchParams.delete('addRound')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, availableRounds, selectedRounds, setSearchParams])
 
   const loadAvailableRounds = async () => {
     const { data: rounds } = await supabase
@@ -236,7 +251,13 @@ export function EventEditor() {
           + Add Round from Library
         </button>
 
-        <button onClick={() => navigate('/rounds/new')} className="create-round-btn">
+        <button
+          onClick={() => {
+            const returnPath = id ? `/events/${id}/edit` : '/events/new'
+            navigate(`/rounds/new?returnTo=${encodeURIComponent(returnPath)}`)
+          }}
+          className="create-round-btn"
+        >
           + Create New Round
         </button>
       </div>

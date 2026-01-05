@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Question } from '../lib/database.types'
@@ -17,8 +17,10 @@ type EditorMode = 'cards' | 'markdown'
 export function RoundEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useAuth()
   const isEditing = Boolean(id)
+  const returnTo = searchParams.get('returnTo')
 
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
@@ -329,7 +331,13 @@ export function RoundEditor() {
         })
       }
 
-      navigate('/')
+      // Navigate back to event editor if we came from there, otherwise dashboard
+      if (returnTo) {
+        const separator = returnTo.includes('?') ? '&' : '?'
+        navigate(`${returnTo}${separator}addRound=${roundId}`)
+      } else {
+        navigate('/')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save round')
     } finally {
@@ -345,7 +353,7 @@ export function RoundEditor() {
     <div className="round-editor">
       <header>
         <h1>{isEditing ? 'Edit Round' : 'Create New Round'}</h1>
-        <button onClick={() => navigate('/')} className="back-btn">
+        <button onClick={() => navigate(returnTo || '/')} className="back-btn">
           Back
         </button>
       </header>
