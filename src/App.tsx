@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
+import { RoundEditor } from './pages/RoundEditor'
 import './App.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -48,6 +49,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <Dashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rounds/new"
+        element={
+          <ProtectedRoute>
+            <RoundEditor />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rounds/:id/edit"
+        element={
+          <ProtectedRoute>
+            <RoundEditor />
           </ProtectedRoute>
         }
       />
