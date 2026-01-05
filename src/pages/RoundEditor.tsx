@@ -27,56 +27,49 @@ export function RoundEditor() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    if (id) {
-      loadRound(id)
-    }
-  }, [id])
-
-  // Sync questions to markdown when switching modes
-  useEffect(() => {
-    if (editorMode === 'markdown' && questions.length > 0) {
-      setMarkdownText(questionsToMarkdown(questions))
-    }
-  }, [editorMode])
-
-  const loadRound = async (roundId: string) => {
-    const { data: round } = await supabase
-      .from('rounds')
-      .select('*')
-      .eq('id', roundId)
-      .single()
-
-    if (round) {
-      setTitle(round.title)
-      setTopic(round.topic || '')
-
-      const { data: roundQuestions } = await supabase
-        .from('round_questions')
-        .select('position, questions(*)')
-        .eq('round_id', roundId)
-        .order('position')
-
-      if (roundQuestions) {
-        const loadedQuestions = roundQuestions.map((rq) => {
-          const q = rq.questions as unknown as Question
-          return {
-            id: q.id,
-            text: q.text,
-            answer: q.answer,
-          }
-        })
-        setQuestions(loadedQuestions)
-        setMarkdownText(questionsToMarkdown(loadedQuestions))
-      }
-    }
-  }
-
   const questionsToMarkdown = (qs: QuestionDraft[]): string => {
     return qs
       .map((q, i) => `${i + 1}. ${q.text}\nAnswer: ${q.answer}`)
       .join('\n\n')
   }
+
+  useEffect(() => {
+    const loadRound = async (roundId: string) => {
+      const { data: round } = await supabase
+        .from('rounds')
+        .select('*')
+        .eq('id', roundId)
+        .single()
+
+      if (round) {
+        setTitle(round.title)
+        setTopic(round.topic || '')
+
+        const { data: roundQuestions } = await supabase
+          .from('round_questions')
+          .select('position, questions(*)')
+          .eq('round_id', roundId)
+          .order('position')
+
+        if (roundQuestions) {
+          const loadedQuestions = roundQuestions.map((rq) => {
+            const q = rq.questions as unknown as Question
+            return {
+              id: q.id,
+              text: q.text,
+              answer: q.answer,
+            }
+          })
+          setQuestions(loadedQuestions)
+          setMarkdownText(questionsToMarkdown(loadedQuestions))
+        }
+      }
+    }
+
+    if (id) {
+      loadRound(id)
+    }
+  }, [id])
 
   const parseMarkdown = (text: string): QuestionDraft[] => {
     const lines = text.split('\n')

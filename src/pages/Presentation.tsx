@@ -23,85 +23,85 @@ export function Presentation() {
   const [showAnswer, setShowAnswer] = useState(false)
 
   useEffect(() => {
+    const loadEvent = async (eventId: string) => {
+      const { data: event } = await supabase
+        .from('events')
+        .select('*')
+        .eq('id', eventId)
+        .single()
+
+      if (!event) {
+        navigate('/')
+        return
+      }
+
+      const { data: eventRounds } = await supabase
+        .from('event_rounds')
+        .select('position, rounds(id, title, topic)')
+        .eq('event_id', eventId)
+        .order('position')
+
+      if (!eventRounds) {
+        navigate('/')
+        return
+      }
+
+      const slideList: SlideData[] = []
+
+      // Cover slide
+      slideList.push({
+        type: 'cover',
+        title: event.title,
+        date: new Date(event.date).toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        }),
+      })
+
+      // Load each round's questions
+      for (const er of eventRounds) {
+        const round = er.rounds as unknown as Round
+
+        // Round intro slide
+        slideList.push({
+          type: 'round-intro',
+          roundNumber: er.position,
+          roundTitle: round.title,
+        })
+
+        // Get questions for this round
+        const { data: roundQuestions } = await supabase
+          .from('round_questions')
+          .select('position, questions(*)')
+          .eq('round_id', round.id)
+          .order('position')
+
+        if (roundQuestions) {
+          for (const rq of roundQuestions) {
+            const question = rq.questions as unknown as Question
+
+            // Question slide
+            slideList.push({
+              type: 'question',
+              roundNumber: er.position,
+              questionNumber: rq.position,
+              questionText: question.text,
+              answer: question.answer,
+            })
+          }
+        }
+      }
+
+      setSlides(slideList)
+      setLoading(false)
+    }
+
     if (id) {
       loadEvent(id)
     }
-  }, [id])
-
-  const loadEvent = async (eventId: string) => {
-    const { data: event } = await supabase
-      .from('events')
-      .select('*')
-      .eq('id', eventId)
-      .single()
-
-    if (!event) {
-      navigate('/')
-      return
-    }
-
-    const { data: eventRounds } = await supabase
-      .from('event_rounds')
-      .select('position, rounds(id, title, topic)')
-      .eq('event_id', eventId)
-      .order('position')
-
-    if (!eventRounds) {
-      navigate('/')
-      return
-    }
-
-    const slideList: SlideData[] = []
-
-    // Cover slide
-    slideList.push({
-      type: 'cover',
-      title: event.title,
-      date: new Date(event.date).toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-    })
-
-    // Load each round's questions
-    for (const er of eventRounds) {
-      const round = er.rounds as unknown as Round
-
-      // Round intro slide
-      slideList.push({
-        type: 'round-intro',
-        roundNumber: er.position,
-        roundTitle: round.title,
-      })
-
-      // Get questions for this round
-      const { data: roundQuestions } = await supabase
-        .from('round_questions')
-        .select('position, questions(*)')
-        .eq('round_id', round.id)
-        .order('position')
-
-      if (roundQuestions) {
-        for (const rq of roundQuestions) {
-          const question = rq.questions as unknown as Question
-
-          // Question slide
-          slideList.push({
-            type: 'question',
-            roundNumber: er.position,
-            questionNumber: rq.position,
-            questionText: question.text,
-            answer: question.answer,
-          })
-        }
-      }
-    }
-
-    setSlides(slideList)
-    setLoading(false)
-  }
+  }, [id, navigate])
 
   const nextSlide = useCallback(() => {
     const current = slides[currentSlide]

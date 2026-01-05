@@ -11,21 +11,20 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    const loadEvents = async () => {
+      const { data } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(10)
+
+      if (data) {
+        setEvents(data)
+      }
+      setLoading(false)
+    }
     loadEvents()
   }, [])
-
-  const loadEvents = async () => {
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .order('date', { ascending: false })
-      .limit(10)
-
-    if (data) {
-      setEvents(data)
-    }
-    setLoading(false)
-  }
 
   const handleSignOut = async () => {
     await signOut()
