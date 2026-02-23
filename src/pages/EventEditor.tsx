@@ -3,6 +3,18 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Round } from '../lib/database.types'
+import { Layout } from '@/components/Layout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 
 interface RoundSelection {
   id: string
@@ -46,21 +58,17 @@ export function EventEditor() {
     }
   }, [id])
 
-  // Handle newly created round from RoundEditor - add to UI and persist to DB
   useEffect(() => {
     const addRoundId = searchParams.get('addRound')
     if (addRoundId && availableRounds.length > 0 && id) {
       const roundToAdd = availableRounds.find((r) => r.id === addRoundId)
       if (roundToAdd && !selectedRounds.find((r) => r.id === addRoundId)) {
-        // Add to UI
         setSelectedRounds((prev) => {
           const newRounds = [...prev, roundToAdd]
-          // Persist to database
           persistRoundToEvent(addRoundId, newRounds.length)
           return newRounds
         })
       }
-      // Clear the param
       searchParams.delete('addRound')
       setSearchParams(searchParams, { replace: true })
     }
@@ -69,7 +77,6 @@ export function EventEditor() {
   const handleCreateNewRound = async () => {
     let eventId = id
 
-    // If this is a new event, save it first
     if (!eventId) {
       const eventTitle = title.trim() || 'Untitled Trivia Night'
       const { data: newEvent, error: eventError } = await supabase
@@ -85,7 +92,6 @@ export function EventEditor() {
       eventId = newEvent.id
     }
 
-    // Navigate to round editor with return path to this event
     navigate(`/rounds/new?returnTo=${encodeURIComponent(`/events/${eventId}/edit`)}`)
   }
 
@@ -96,7 +102,6 @@ export function EventEditor() {
       .order('created_at', { ascending: false })
 
     if (rounds) {
-      // Get question counts for each round
       const roundsWithCounts = await Promise.all(
         rounds.map(async (round) => {
           const { count } = await supabase
@@ -213,7 +218,6 @@ export function EventEditor() {
         eventId = newEvent.id
       }
 
-      // Add rounds to event
       for (let i = 0; i < selectedRounds.length; i++) {
         await supabase.from('event_rounds').insert({
           event_id: eventId,
@@ -222,11 +226,9 @@ export function EventEditor() {
         })
       }
 
-      // Show saved feedback
       setSaved(true)
       setTimeout(() => setSaved(false), 2000)
 
-      // If we just created the event, update URL to edit mode
       if (!id && eventId) {
         navigate(`/events/${eventId}/edit`, { replace: true })
       }
@@ -242,85 +244,91 @@ export function EventEditor() {
   )
 
   return (
-    <div className="event-editor">
-      <header>
-        <h1>{isEditing ? 'Edit Trivia Night' : 'Create New Trivia Night'}</h1>
-        <button onClick={() => navigate('/')} className="back-btn">
-          Back
-        </button>
-      </header>
+    <Layout
+      title={isEditing ? 'Edit Trivia Night' : 'Create New Trivia Night'}
+      maxWidth="md"
+      backTo="/"
+    >
+      <div className="space-y-6">
+        <div className="flex gap-3">
+          <Input
+            type="text"
+            placeholder="Event Title (e.g., Tuesday Trivia)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="flex-1 text-lg"
+          />
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="w-44"
+          />
+        </div>
 
-      <div className="event-meta">
-        <input
-          type="text"
-          placeholder="Event Title (e.g., Tuesday Trivia)"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="title-input"
-        />
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="date-input"
-        />
-      </div>
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold">Rounds ({selectedRounds.length})</h2>
 
-      <div className="rounds-list">
-        <h2>Rounds ({selectedRounds.length})</h2>
+          {selectedRounds.map((round, index) => (
+            <Card key={round.id} className="py-3">
+              <CardContent className="flex items-center justify-between">
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-sm text-muted-foreground">Round {index + 1}</span>
+                  <span className="font-medium">{round.title}</span>
+                  <span className="text-sm text-muted-foreground">
+                    {round.questionCount} questions
+                    {round.topic && ` · ${round.topic}`}
+                  </span>
+                </div>
+                <div className="flex gap-1">
+                  <Button variant="outline" size="icon-xs" onClick={() => moveRound(index, 'up')} disabled={index === 0}>
+                    ↑
+                  </Button>
+                  <Button variant="outline" size="icon-xs" onClick={() => moveRound(index, 'down')} disabled={index === selectedRounds.length - 1}>
+                    ↓
+                  </Button>
+                  <Button variant="outline" size="icon-xs" className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50" onClick={() => removeRound(index)}>
+                    ×
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
 
-        {selectedRounds.map((round, index) => (
-          <div key={round.id} className="round-card">
-            <div className="round-info">
-              <span className="round-number">Round {index + 1}</span>
-              <span className="round-title">{round.title}</span>
-              <span className="round-meta-info">
-                {round.questionCount} questions
-                {round.topic && ` · ${round.topic}`}
-              </span>
-            </div>
-            <div className="round-actions">
-              <button onClick={() => moveRound(index, 'up')} disabled={index === 0}>
-                ↑
-              </button>
-              <button
-                onClick={() => moveRound(index, 'down')}
-                disabled={index === selectedRounds.length - 1}
-              >
-                ↓
-              </button>
-              <button onClick={() => removeRound(index)} className="remove-btn">
-                ×
-              </button>
-            </div>
-          </div>
-        ))}
+          <Button
+            variant="outline"
+            className="w-full border-dashed border-2 h-12 text-muted-foreground"
+            onClick={() => setShowRoundPicker(true)}
+          >
+            + Add Round from Library
+          </Button>
 
-        <button onClick={() => setShowRoundPicker(true)} className="add-round-btn">
-          + Add Round from Library
-        </button>
+          <Button
+            variant="outline"
+            className="w-full h-12 text-muted-foreground"
+            onClick={handleCreateNewRound}
+          >
+            + Create New Round
+          </Button>
+        </div>
 
-        <button onClick={handleCreateNewRound} className="create-round-btn">
-          + Create New Round
-        </button>
-      </div>
-
-      {showRoundPicker && (
-        <div className="modal-overlay" onClick={() => setShowRoundPicker(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Select a Round</h3>
+        <Dialog open={showRoundPicker} onOpenChange={setShowRoundPicker}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Select a Round</DialogTitle>
+            </DialogHeader>
             {unselectedRounds.length === 0 ? (
-              <p className="no-rounds">No more rounds available</p>
+              <p className="text-center text-muted-foreground py-4">No more rounds available</p>
             ) : (
-              <div className="round-picker-list">
+              <div className="space-y-2 max-h-96 overflow-y-auto">
                 {unselectedRounds.map((round) => (
                   <button
                     key={round.id}
                     onClick={() => addRound(round)}
-                    className="round-picker-item"
+                    className="w-full flex flex-col items-start gap-1 p-3 rounded-md border hover:border-primary hover:bg-accent text-left transition-colors"
                   >
-                    <span className="round-title">{round.title}</span>
-                    <span className="round-meta-info">
+                    <span className="font-medium">{round.title}</span>
+                    <span className="text-sm text-muted-foreground">
                       {round.questionCount} questions
                       {round.topic && ` · ${round.topic}`}
                     </span>
@@ -328,21 +336,27 @@ export function EventEditor() {
                 ))}
               </div>
             )}
-            <button onClick={() => setShowRoundPicker(false)} className="close-btn">
-              Close
-            </button>
-          </div>
+            <DialogFooter showCloseButton />
+          </DialogContent>
+        </Dialog>
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        {saved && (
+          <Alert>
+            <AlertDescription className="text-green-600">Saved!</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving} size="lg">
+            {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Trivia Night'}
+          </Button>
         </div>
-      )}
-
-      {error && <p className="error">{error}</p>}
-      {saved && <p className="success">Saved!</p>}
-
-      <div className="save-actions">
-        <button onClick={handleSave} disabled={saving} className="save-btn">
-          {saving ? 'Saving...' : saved ? 'Saved!' : 'Save Trivia Night'}
-        </button>
       </div>
-    </div>
+    </Layout>
   )
 }

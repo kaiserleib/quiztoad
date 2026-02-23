@@ -4,6 +4,14 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Question } from '../lib/database.types'
 import { triviaPrompt } from '../lib/prompts'
+import { Layout } from '@/components/Layout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 
 interface QuestionDraft {
   id?: string
@@ -78,15 +86,13 @@ export function RoundEditor() {
   const parseMarkdown = (text: string): QuestionDraft[] => {
     const lines = text.split('\n')
     const parsed: QuestionDraft[] = []
-    let currentQuestion: { text: string; answer: string } | null = null
     let questionLines: string[] = []
 
     for (const line of lines) {
       const trimmed = line.trim()
 
-      // Check if this is an answer line
       if (trimmed.toLowerCase().startsWith('answer:')) {
-        if (currentQuestion || questionLines.length > 0) {
+        if (questionLines.length > 0) {
           const answer = trimmed.substring(7).trim()
           const questionText = questionLines.join('\n').trim()
           if (questionText) {
@@ -97,15 +103,12 @@ export function RoundEditor() {
             })
           }
           questionLines = []
-          currentQuestion = null
         }
         continue
       }
 
-      // Check if this starts a new numbered question
       const numberMatch = trimmed.match(/^(\d+)\.\s*(.*)/)
       if (numberMatch) {
-        // Save previous question if exists without answer
         if (questionLines.length > 0) {
           const questionText = questionLines.join('\n').trim()
           if (questionText) {
@@ -120,13 +123,11 @@ export function RoundEditor() {
         continue
       }
 
-      // Continue current question
       if (trimmed || questionLines.length > 0) {
         questionLines.push(trimmed)
       }
     }
 
-    // Handle last question if no answer
     if (questionLines.length > 0) {
       const questionText = questionLines.join('\n').trim()
       if (questionText) {
@@ -151,7 +152,6 @@ export function RoundEditor() {
     setError('')
 
     try {
-      // Get user's API key
       const { data: settings } = await supabase
         .from('user_settings')
         .select('claude_api_key')
@@ -192,14 +192,12 @@ export function RoundEditor() {
       const data = await response.json()
       const generatedText = data.content[0]?.text || ''
 
-      // Append to existing markdown or set new
       if (markdownText.trim()) {
         setMarkdownText(markdownText + '\n\n' + generatedText)
       } else {
         setMarkdownText(generatedText)
       }
 
-      // Auto-set title if empty
       if (!title.trim()) {
         setTitle(topic)
       }
@@ -250,7 +248,6 @@ export function RoundEditor() {
   }
 
   const handleSave = async () => {
-    // Parse markdown if in markdown mode
     let questionsToSave = questions
     if (editorMode === 'markdown') {
       questionsToSave = parseMarkdown(markdownText)
@@ -285,7 +282,6 @@ export function RoundEditor() {
           .update({ title, topic: topic || null })
           .eq('id', id)
 
-        // Delete existing round_questions
         await supabase.from('round_questions').delete().eq('round_id', id)
       } else {
         const { data: newRound, error: roundError } = await supabase
@@ -298,7 +294,6 @@ export function RoundEditor() {
         roundId = newRound.id
       }
 
-      // Create/update questions and link to round
       for (let i = 0; i < questionsToSave.length; i++) {
         const q = questionsToSave[i]
         let questionId = q.id
@@ -331,7 +326,6 @@ export function RoundEditor() {
         })
       }
 
-      // Navigate back to event editor if we came from there, otherwise dashboard
       if (returnTo) {
         const separator = returnTo.includes('?') ? '&' : '?'
         navigate(`${returnTo}${separator}addRound=${roundId}`)
@@ -349,125 +343,127 @@ export function RoundEditor() {
     ? parseMarkdown(markdownText).length
     : questions.length
 
+  const handleTabChange = (value: string) => {
+    if (value === 'cards') switchToCards()
+    else switchToMarkdown()
+  }
+
   return (
-    <div className="round-editor">
-      <header>
-        <h1>{isEditing ? 'Edit Round' : 'Create New Round'}</h1>
-        <button onClick={() => navigate(returnTo || '/')} className="back-btn">
-          Back
-        </button>
-      </header>
-
-      <div className="round-meta">
-        <input
-          type="text"
-          placeholder="Round Title (e.g., Classic Cars)"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="title-input"
-        />
-        <input
-          type="text"
-          placeholder="Topic (optional)"
-          value={topic}
-          onChange={(e) => setTopic(e.target.value)}
-          className="topic-input"
-        />
-      </div>
-
-      <div className="editor-controls">
-        <div className="editor-mode-toggle">
-          <button
-            className={editorMode === 'markdown' ? 'active' : ''}
-            onClick={switchToMarkdown}
-          >
-            Markdown
-          </button>
-          <button
-            className={editorMode === 'cards' ? 'active' : ''}
-            onClick={switchToCards}
-          >
-            Cards
-          </button>
-        </div>
-
-        <button
-          onClick={generateWithClaude}
-          disabled={generating}
-          className="generate-btn"
-        >
-          {generating ? 'Generating...' : 'Generate with Claude'}
-        </button>
-      </div>
-
-      {editorMode === 'markdown' ? (
-        <div className="markdown-editor">
-          <div className="markdown-help">
-            Format: <code>1. Question text? A) ... B) ... Answer: B) The answer</code>
-          </div>
-          <textarea
-            value={markdownText}
-            onChange={(e) => setMarkdownText(e.target.value)}
-            placeholder={`1. What is the capital of France?
-Answer: Paris
-
-2. Which planet is known as the Red Planet? A) Venus B) Mars C) Jupiter D) Saturn
-Answer: B) Mars`}
-            rows={20}
+    <Layout
+      title={isEditing ? 'Edit Round' : 'Create New Round'}
+      maxWidth="md"
+      backTo={returnTo || '/'}
+    >
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <Input
+            type="text"
+            placeholder="Round Title (e.g., Classic Cars)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-lg"
           />
-          <div className="question-count">{questionCount} questions detected</div>
+          <Input
+            type="text"
+            placeholder="Topic (optional)"
+            value={topic}
+            onChange={(e) => setTopic(e.target.value)}
+          />
         </div>
-      ) : (
-        <div className="questions-list">
-          <h2>Questions ({questions.length})</h2>
 
-          {questions.map((q, index) => (
-            <div key={index} className="question-card">
-              <div className="question-header">
-                <span className="question-number">Q{index + 1}</span>
-                <div className="question-actions">
-                  <button onClick={() => moveQuestion(index, 'up')} disabled={index === 0}>
-                    ↑
-                  </button>
-                  <button
-                    onClick={() => moveQuestion(index, 'down')}
-                    disabled={index === questions.length - 1}
-                  >
-                    ↓
-                  </button>
-                  <button onClick={() => removeQuestion(index)} className="remove-btn">
-                    ×
-                  </button>
-                </div>
-              </div>
-              <textarea
-                placeholder="Question text (include multiple choice options if applicable)"
-                value={q.text}
-                onChange={(e) => updateQuestion(index, 'text', e.target.value)}
-                rows={3}
-              />
-              <input
-                type="text"
-                placeholder="Answer"
-                value={q.answer}
-                onChange={(e) => updateQuestion(index, 'answer', e.target.value)}
-              />
+        <div className="flex items-center justify-between">
+          <Tabs value={editorMode} onValueChange={handleTabChange}>
+            <TabsList>
+              <TabsTrigger value="markdown">Markdown</TabsTrigger>
+              <TabsTrigger value="cards">Cards</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <Button
+            variant="outline"
+            onClick={generateWithClaude}
+            disabled={generating}
+            className="border-green-300 text-green-700 hover:bg-green-50"
+          >
+            {generating ? 'Generating...' : 'Generate with Claude'}
+          </Button>
+        </div>
+
+        {editorMode === 'markdown' ? (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Format: <code className="bg-muted px-1.5 py-0.5 rounded text-xs">1. Question text? A) ... B) ... Answer: B) The answer</code>
+            </p>
+            <Textarea
+              value={markdownText}
+              onChange={(e) => setMarkdownText(e.target.value)}
+              placeholder={`1. What is the capital of France?\nAnswer: Paris\n\n2. Which planet is known as the Red Planet? A) Venus B) Mars C) Jupiter D) Saturn\nAnswer: B) Mars`}
+              rows={20}
+              className="font-mono"
+            />
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{questionCount} questions detected</Badge>
             </div>
-          ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold">Questions ({questions.length})</h2>
 
-          <button onClick={addQuestion} className="add-question-btn">
-            + Add Question
-          </button>
+            {questions.map((q, index) => (
+              <Card key={index} className="py-3">
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-muted-foreground">Q{index + 1}</span>
+                    <div className="flex gap-1">
+                      <Button variant="outline" size="icon-xs" onClick={() => moveQuestion(index, 'up')} disabled={index === 0}>
+                        ↑
+                      </Button>
+                      <Button variant="outline" size="icon-xs" onClick={() => moveQuestion(index, 'down')} disabled={index === questions.length - 1}>
+                        ↓
+                      </Button>
+                      <Button variant="outline" size="icon-xs" className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive/50" onClick={() => removeQuestion(index)}>
+                        ×
+                      </Button>
+                    </div>
+                  </div>
+                  <Textarea
+                    placeholder="Question text (include multiple choice options if applicable)"
+                    value={q.text}
+                    onChange={(e) => updateQuestion(index, 'text', e.target.value)}
+                    rows={3}
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Answer"
+                    value={q.answer}
+                    onChange={(e) => updateQuestion(index, 'answer', e.target.value)}
+                  />
+                </CardContent>
+              </Card>
+            ))}
+
+            <Button
+              variant="outline"
+              className="w-full border-dashed border-2 h-12 text-muted-foreground"
+              onClick={addQuestion}
+            >
+              + Add Question
+            </Button>
+          </div>
+        )}
+
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex justify-end">
+          <Button onClick={handleSave} disabled={saving} size="lg">
+            {saving ? 'Saving...' : 'Save Round'}
+          </Button>
         </div>
-      )}
-
-      {error && <p className="error">{error}</p>}
-
-      <div className="save-actions">
-        <button onClick={handleSave} disabled={saving} className="save-btn">
-          {saving ? 'Saving...' : 'Save Round'}
-        </button>
       </div>
-    </div>
+    </Layout>
   )
 }

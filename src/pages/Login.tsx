@@ -1,6 +1,11 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 type AuthMode = 'signin' | 'signup' | 'magic'
 
@@ -48,62 +53,72 @@ export function Login() {
   }
 
   return (
-    <div className="login-container">
-      <h1>Trivia Master</h1>
+    <div className="min-h-screen flex items-center justify-center px-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="text-3xl">Trivia Master</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+          >
+            Sign in with Google
+          </Button>
 
-      <button onClick={handleGoogleSignIn} className="google-btn" disabled={loading}>
-        Sign in with Google
-      </button>
+          <div className="relative text-center">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <span className="relative bg-card px-2 text-sm text-muted-foreground">or</span>
+          </div>
 
-      <div className="divider">or</div>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as AuthMode)}>
+            <TabsList className="w-full">
+              <TabsTrigger value="signin">Sign In</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="magic">Magic Link</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-      <div className="mode-tabs">
-        <button
-          className={mode === 'signin' ? 'active' : ''}
-          onClick={() => setMode('signin')}
-        >
-          Sign In
-        </button>
-        <button
-          className={mode === 'signup' ? 'active' : ''}
-          onClick={() => setMode('signup')}
-        >
-          Sign Up
-        </button>
-        <button
-          className={mode === 'magic' ? 'active' : ''}
-          onClick={() => setMode('magic')}
-        >
-          Magic Link
-        </button>
-      </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
 
-      <form onSubmit={handleSubmit}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
+            {mode !== 'magic' && (
+              <Input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            )}
 
-        {mode !== 'magic' && (
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        )}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Loading...' : mode === 'magic' ? 'Send Magic Link' : mode === 'signup' ? 'Sign Up' : 'Sign In'}
+            </Button>
+          </form>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Loading...' : mode === 'magic' ? 'Send Magic Link' : mode === 'signup' ? 'Sign Up' : 'Sign In'}
-        </button>
-      </form>
-
-      {error && <p className="error">{error}</p>}
-      {message && <p className="message">{message}</p>}
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          {message && (
+            <Alert>
+              <AlertDescription className="text-green-600">{message}</AlertDescription>
+            </Alert>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }

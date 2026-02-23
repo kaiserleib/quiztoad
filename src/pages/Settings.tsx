@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { Layout } from '@/components/Layout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export function Settings() {
-  const navigate = useNavigate()
   const { user } = useAuth()
   const [apiKey, setApiKey] = useState('')
   const [saving, setSaving] = useState(false)
@@ -22,7 +25,6 @@ export function Settings() {
         .single()
 
       if (data?.claude_api_key) {
-        // Show masked key
         setApiKey('sk-ant-••••••••' + data.claude_api_key.slice(-4))
       }
       setLoading(false)
@@ -34,7 +36,6 @@ export function Settings() {
   const handleSave = async () => {
     if (!user) return
 
-    // Don't save if it's the masked version
     if (apiKey.includes('••••')) {
       setMessage('Enter a new API key to update')
       return
@@ -79,44 +80,52 @@ export function Settings() {
   }
 
   if (loading) {
-    return <div className="settings"><p>Loading...</p></div>
+    return (
+      <div className="flex items-center justify-center h-screen text-lg">
+        Loading...
+      </div>
+    )
   }
 
   return (
-    <div className="settings">
-      <header>
-        <h1>Settings</h1>
-        <button onClick={() => navigate('/')} className="back-btn">
-          Back
-        </button>
-      </header>
+    <Layout title="Settings" maxWidth="md" backTo="/">
+      <Card>
+        <CardHeader>
+          <CardTitle>Claude API Key</CardTitle>
+          <CardDescription>
+            Enter your Claude API key to enable AI-generated trivia questions.
+            Get one at{' '}
+            <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline">
+              console.anthropic.com
+            </a>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              type="password"
+              placeholder="sk-ant-api03-..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              className="font-mono"
+            />
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+            {apiKey && (
+              <Button variant="outline" onClick={handleClear} disabled={saving}>
+                Clear
+              </Button>
+            )}
+          </div>
 
-      <section className="settings-section">
-        <h2>Claude API Key</h2>
-        <p className="settings-description">
-          Enter your Claude API key to enable AI-generated trivia questions.
-          Get one at <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer">console.anthropic.com</a>
-        </p>
-
-        <div className="api-key-input">
-          <input
-            type="password"
-            placeholder="sk-ant-api03-..."
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-          <button onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </button>
-          {apiKey && (
-            <button onClick={handleClear} disabled={saving} className="clear-btn">
-              Clear
-            </button>
+          {message && (
+            <Alert>
+              <AlertDescription>{message}</AlertDescription>
+            </Alert>
           )}
-        </div>
-
-        {message && <p className="settings-message">{message}</p>}
-      </section>
-    </div>
+        </CardContent>
+      </Card>
+    </Layout>
   )
 }

@@ -7,7 +7,6 @@ import { EventEditor } from './pages/EventEditor'
 import { Presentation } from './pages/Presentation'
 import { PrintView } from './pages/PrintView'
 import { Settings } from './pages/Settings'
-import './App.css'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()

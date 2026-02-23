@@ -3,12 +3,18 @@ import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Event } from '../lib/database.types'
+import { Layout } from '@/components/Layout'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 export function Dashboard() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -16,7 +22,6 @@ export function Dashboard() {
         .from('events')
         .select('*')
         .order('date', { ascending: false })
-        .limit(10)
 
       if (data) {
         setEvents(data)
@@ -26,13 +31,16 @@ export function Dashboard() {
     loadEvents()
   }, [])
 
+  const filteredEvents = events.filter((event) =>
+    event.title.toLowerCase().includes(search.toLowerCase())
+  )
+
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
   }
 
   const formatDate = (dateStr: string) => {
-    // Add T12:00:00 to avoid timezone shifts (YYYY-MM-DD is parsed as UTC midnight)
     return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
@@ -41,63 +49,75 @@ export function Dashboard() {
   }
 
   return (
-    <div className="dashboard">
-      <header>
-        <h1>Trivia Master</h1>
-        <div className="user-info">
-          <span>{user?.email}</span>
-          <button onClick={() => navigate('/settings')}>Settings</button>
-          <button onClick={handleSignOut}>Sign Out</button>
+    <Layout
+      title="Trivia Master"
+      maxWidth="xl"
+      headerActions={
+        <>
+          <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
+          <Button variant="outline" onClick={() => navigate('/settings')}>Settings</Button>
+          <Button variant="outline" onClick={handleSignOut}>Sign Out</Button>
+        </>
+      }
+    >
+      <section className="mb-8">
+        <h2 className="text-lg font-semibold mb-3">What would you like to do?</h2>
+        <div className="flex gap-3 flex-wrap">
+          <Button onClick={() => navigate('/events/new')}>
+            Create New Trivia Night
+          </Button>
+          <Button variant="secondary" onClick={() => navigate('/rounds/new')}>
+            Create New Round
+          </Button>
         </div>
-      </header>
+      </section>
 
-      <main>
-        <section className="actions">
-          <h2>What would you like to do?</h2>
-          <div className="action-buttons">
-            <button onClick={() => navigate('/events/new')}>
-              Create New Trivia Night
-            </button>
-            <button onClick={() => navigate('/rounds/new')}>
-              Create New Round
-            </button>
-          </div>
-        </section>
-
-        <section className="recent">
-          <h2>Recent Events</h2>
-          {loading ? (
-            <p>Loading...</p>
-          ) : events.length === 0 ? (
-            <p>No events yet. Create your first trivia night!</p>
-          ) : (
-            <div className="events-list">
-              {events.map((event) => (
-                <div key={event.id} className="event-card">
-                  <div className="event-info">
-                    <span className="event-title">{event.title}</span>
-                    <span className="event-date">{formatDate(event.date)}</span>
-                  </div>
-                  <div className="event-actions">
-                    <button onClick={() => navigate(`/events/${event.id}/edit`)}>
-                      Edit
-                    </button>
-                    <button onClick={() => navigate(`/events/${event.id}/print`)}>
-                      Print
-                    </button>
-                    <button
-                      onClick={() => navigate(`/events/${event.id}/present`)}
-                      className="present-btn"
-                    >
-                      Present
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+      <section>
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-lg font-semibold">Events</h2>
+          {events.length > 0 && (
+            <Badge variant="secondary">{events.length}</Badge>
           )}
-        </section>
-      </main>
-    </div>
+        </div>
+        <Input
+          type="text"
+          placeholder="Search events..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="mb-4"
+        />
+        {loading ? (
+          <p className="text-muted-foreground">Loading...</p>
+        ) : events.length === 0 ? (
+          <p className="text-muted-foreground">No events yet. Create your first trivia night!</p>
+        ) : filteredEvents.length === 0 ? (
+          <p className="text-muted-foreground">No events match "{search}"</p>
+        ) : (
+          <div className="space-y-3">
+            {filteredEvents.map((event) => (
+              <Card key={event.id} className="py-3">
+                <CardContent className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{event.title}</span>
+                    <span className="text-sm text-muted-foreground">{formatDate(event.date)}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/events/${event.id}/edit`)}>
+                      Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/events/${event.id}/print`)}>
+                      Print
+                    </Button>
+                    <Button size="sm" onClick={() => navigate(`/events/${event.id}/present`)}>
+                      Present
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+    </Layout>
   )
 }

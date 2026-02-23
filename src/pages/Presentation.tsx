@@ -59,8 +59,6 @@ export function Presentation() {
       const slideList: SlideData[] = []
       const roundList: RoundInfo[] = []
 
-      // Cover slide
-      // Add T12:00:00 to avoid timezone shifts (YYYY-MM-DD is parsed as UTC midnight)
       slideList.push({
         type: 'cover',
         title: event.title,
@@ -72,19 +70,16 @@ export function Presentation() {
         }),
       })
 
-      // Load each round's questions
       for (const er of eventRounds) {
         const round = er.rounds as unknown as Round
         const roundStartIndex = slideList.length
 
-        // Round intro slide
         slideList.push({
           type: 'round-intro',
           roundNumber: er.position,
           roundTitle: round.title,
         })
 
-        // Get questions for this round
         const { data: roundQuestions } = await supabase
           .from('round_questions')
           .select('position, questions(*)')
@@ -96,7 +91,6 @@ export function Presentation() {
           for (const rq of roundQuestions) {
             const question = rq.questions as unknown as Question
 
-            // Question slide
             slideList.push({
               type: 'question',
               roundNumber: er.position,
@@ -129,7 +123,6 @@ export function Presentation() {
   const nextSlide = useCallback(() => {
     const current = slides[currentSlide]
 
-    // In review mode on a question, reveal answer first before advancing
     if (reviewingRound !== null && current?.type === 'question' && !answerRevealed) {
       setAnswerRevealed(true)
       return
@@ -160,7 +153,6 @@ export function Presentation() {
   const reviewRound = useCallback((roundNumber: number) => {
     const round = rounds.find((r) => r.number === roundNumber)
     if (round) {
-      // Go to first question of the round (skip the intro slide)
       setCurrentSlide(round.startIndex + 1)
       setReviewingRound(roundNumber)
       setAnswerRevealed(false)
@@ -176,7 +168,6 @@ export function Presentation() {
         e.preventDefault()
         prevSlide()
       }
-      // ESC is handled by fullscreenchange event
     },
     [nextSlide, prevSlide]
   )
@@ -186,16 +177,12 @@ export function Presentation() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // Enter fullscreen when presentation loads
   useEffect(() => {
     if (!loading && containerRef.current) {
-      containerRef.current.requestFullscreen?.().catch(() => {
-        // Fullscreen may be blocked by browser, continue without it
-      })
+      containerRef.current.requestFullscreen?.().catch(() => {})
     }
   }, [loading])
 
-  // Handle exiting fullscreen (e.g., user presses ESC)
   useEffect(() => {
     const handleFullscreenChange = () => {
       if (!document.fullscreenElement) {
@@ -214,20 +201,17 @@ export function Presentation() {
   }
 
   if (loading) {
-    return <div className="presentation loading">Loading...</div>
+    return <div className="fixed inset-0 flex items-center justify-center text-xl text-muted-foreground">Loading...</div>
   }
 
   const slide = slides[currentSlide]
   const inReviewMode = reviewingRound !== null && slide?.roundNumber === reviewingRound
   const showAnswer = inReviewMode && answerRevealed
 
-  // Parse question text to separate question from multiple choice options
   const parseQuestionText = (text: string): { question: string; options: string[] } => {
-    // Look for pattern like "A)" or "A." that indicates start of options
     const optionsMatch = text.match(/^(.*?)\s*([A-D][).]\s*.*)$/s)
     if (optionsMatch) {
       const optionsText = optionsMatch[2]
-      // Split options by A) B) C) D) pattern, keeping the letter
       const options = optionsText.split(/(?=[A-D][).]\s*)/).filter(Boolean).map(o => o.trim())
       return {
         question: optionsMatch[1].trim(),
@@ -240,79 +224,102 @@ export function Presentation() {
   const parsedQuestion = slide?.questionText ? parseQuestionText(slide.questionText) : null
 
   return (
-    <div ref={containerRef} className="presentation" onClick={nextSlide}>
+    <div
+      ref={containerRef}
+      className="fixed inset-0 bg-white flex items-center justify-center cursor-pointer"
+      onClick={nextSlide}
+    >
       {/* Top navigation bar */}
-      <div className="presentation-nav" onClick={(e) => e.stopPropagation()}>
-        <div className="round-nav">
+      <div
+        className="absolute top-0 left-0 right-0 flex justify-between items-center px-4 py-3 bg-white/90 border-b z-10"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex gap-2">
           {rounds.map((round) => (
             <button
               key={round.number}
               onClick={() => goToRound(round.number)}
-              className={slide?.roundNumber === round.number && !reviewingRound ? 'active' : ''}
+              className={`px-3 py-1.5 text-sm rounded-md border cursor-pointer transition-colors ${
+                slide?.roundNumber === round.number && !reviewingRound
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-transparent border-border text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
             >
               Round {round.number}
             </button>
           ))}
         </div>
-        <div className="slide-counter">
+        <span className="text-sm text-muted-foreground">
           {currentSlide + 1} / {slides.length}
-        </div>
+        </span>
       </div>
 
       {/* Right side review buttons */}
-      <div className="review-nav" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-10"
+        onClick={(e) => e.stopPropagation()}
+      >
         {rounds.map((round) => (
           <button
             key={round.number}
             onClick={() => reviewRound(round.number)}
-            className={reviewingRound === round.number ? 'active' : ''}
+            className={`px-3 py-1.5 text-sm rounded-md border cursor-pointer transition-colors ${
+              reviewingRound === round.number
+                ? 'bg-orange-500 text-white border-orange-500'
+                : 'bg-transparent border-border text-muted-foreground hover:bg-accent hover:text-foreground'
+            }`}
           >
             Review {round.number}
           </button>
         ))}
       </div>
 
-      <button className="exit-btn" onClick={(e) => { e.stopPropagation(); exitPresentation(); }}>
+      <button
+        className="absolute top-16 right-20 w-12 h-12 bg-transparent border border-border text-muted-foreground rounded-full text-2xl cursor-pointer flex items-center justify-center hover:bg-accent hover:text-foreground transition-colors"
+        onClick={(e) => { e.stopPropagation(); exitPresentation(); }}
+      >
         ×
       </button>
 
       {slide?.type === 'cover' && (
-        <div className="slide slide-cover">
-          <h1>{slide.title}</h1>
-          <p className="date">{slide.date}</p>
+        <div className="text-center p-8 max-w-[90%]">
+          <h1 className="text-6xl font-bold mb-4">{slide.title}</h1>
+          <p className="text-2xl text-muted-foreground">{slide.date}</p>
         </div>
       )}
 
       {slide?.type === 'round-intro' && (
-        <div className="slide slide-round-intro">
-          <p className="round-label">Round {slide.roundNumber}</p>
-          <h1>{slide.roundTitle}</h1>
+        <div className="text-center p-8 max-w-[90%]">
+          <p className="text-2xl text-muted-foreground mb-2">Round {slide.roundNumber}</p>
+          <h1 className="text-6xl font-bold">{slide.roundTitle}</h1>
         </div>
       )}
 
       {slide?.type === 'question' && parsedQuestion && (
-        <div className="slide slide-question">
-          <p className="question-label">
+        <div className="text-center p-8 max-w-[90%]">
+          <p className="text-base text-muted-foreground mb-8">
             Round {slide.roundNumber} · Question {slide.questionNumber}
             {inReviewMode && ' · Review'}
           </p>
-          <div className="question-text">{parsedQuestion.question}</div>
+          <div className="text-4xl leading-relaxed whitespace-pre-wrap max-w-[900px] mx-auto text-left font-medium">
+            {parsedQuestion.question}
+          </div>
           {parsedQuestion.options.length > 0 && (
-            <div className="question-options">
+            <div className="mt-6 text-left max-w-[900px] mx-auto">
               {parsedQuestion.options.map((option, i) => (
-                <div key={i} className="option">{option}</div>
+                <div key={i} className="text-3xl font-normal leading-relaxed py-1">{option}</div>
               ))}
             </div>
           )}
           {showAnswer && (
-            <div className="answer">
-              <span className="answer-label">Answer:</span> {slide.answer}
+            <div className="mt-12 text-3xl text-primary">
+              <span className="text-muted-foreground">Answer:</span> {slide.answer}
             </div>
           )}
         </div>
       )}
 
-      <div className="nav-hint">
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-sm text-muted-foreground/50">
         Press → or click to advance · Press ← to go back · Press Esc to exit
       </div>
     </div>
