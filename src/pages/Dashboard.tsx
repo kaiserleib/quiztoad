@@ -50,7 +50,7 @@ export function Dashboard() {
 
   return (
     <Layout
-      title="Quiz Toad"
+      title="Quiztoad"
       maxWidth="xl"
       headerActions={
         <>

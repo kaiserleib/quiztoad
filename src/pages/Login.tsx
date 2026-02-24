@@ -56,7 +56,7 @@ export function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl">Quiz Toad</CardTitle>
+          <CardTitle className="text-3xl">Quiztoad</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           <Button
