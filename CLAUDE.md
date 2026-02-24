@@ -19,7 +19,7 @@ Support these auth methods via Supabase Auth:
 
 ---
 
-# Trivia Master - the master of trivia!
+# Quiz Toad
 
 For the past year and a half, I've been running a weekly trivia night at a local brewery. My current workflow is as follows: 
 

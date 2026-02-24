@@ -50,7 +50,7 @@ export function Dashboard() {
 
   return (
     <Layout
-      title="Trivia Master"
+      title="Quiz Toad"
       maxWidth="xl"
       headerActions={
         <>
