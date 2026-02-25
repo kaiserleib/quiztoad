@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -119,6 +119,11 @@ export function Login() {
           )}
         </CardContent>
       </Card>
+      <div className="mt-4 text-center text-sm text-muted-foreground">
+        <Link to="/terms" className="hover:underline">Terms of Service</Link>
+        <span className="mx-2">&middot;</span>
+        <Link to="/privacy" className="hover:underline">Privacy Policy</Link>
+      </div>
     </div>
   )
 }

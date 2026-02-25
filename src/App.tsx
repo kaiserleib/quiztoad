@@ -7,6 +7,8 @@ import { EventEditor } from './pages/EventEditor'
 import { Presentation } from './pages/Presentation'
 import { PrintView } from './pages/PrintView'
 import { Settings } from './pages/Settings'
+import { TermsOfService } from './pages/TermsOfService'
+import { PrivacyPolicy } from './pages/PrivacyPolicy'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -39,6 +41,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 function AppRoutes() {
   return (
     <Routes>
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route
         path="/login"
         element={
