@@ -209,16 +209,40 @@ export function Presentation() {
   const showAnswer = inReviewMode && answerRevealed
 
   const parseQuestionText = (text: string): { question: string; options: string[] } => {
-    const optionsMatch = text.match(/^(.*?)\s*([A-D][).]\s*.*)$/s)
-    if (optionsMatch) {
-      const optionsText = optionsMatch[2]
-      const options = optionsText.split(/(?=[A-D][).]\s*)/).filter(Boolean).map(o => o.trim())
-      return {
-        question: optionsMatch[1].trim(),
-        options,
-      }
+    const letters = ['A', 'B', 'C', 'D']
+    type Marker = { letter: string; delim: string; letterPos: number }
+    // Collect candidate option markers: a letter A–D plus ")" or "." delimiter that
+    // sits at a word boundary and is immediately followed by whitespace (or end).
+    const markerRe = /(^|\s)([A-D])([).])(?=\s|$)/g
+    const candidates: Marker[] = []
+    for (let m = markerRe.exec(text); m; m = markerRe.exec(text)) {
+      candidates.push({ letter: m[2], delim: m[3], letterPos: m.index + m[1].length })
     }
-    return { question: text, options: [] }
+    // Build the longest A, B, C… run for each delimiter style independently, then
+    // pick the longest. Requiring a real sequence (sharing one delimiter, starting
+    // at A) prevents name initials (e.g. "A. A. Milne", "Arthur C. Clarke") from
+    // being mistaken for multiple-choice options.
+    let seq: Marker[] = []
+    for (const d of [')', '.']) {
+      const run: Marker[] = []
+      for (const c of candidates) {
+        if (c.delim === d && c.letter === letters[run.length]) {
+          run.push(c)
+          if (run.length === letters.length) break
+        }
+      }
+      if (run.length > seq.length) seq = run
+    }
+    // Need at least A and B to count as multiple-choice.
+    if (seq.length < 2) {
+      return { question: text.trim(), options: [] }
+    }
+    const question = text.slice(0, seq[0].letterPos).trim()
+    const options = seq.map((mk, i) => {
+      const end = i + 1 < seq.length ? seq[i + 1].letterPos : text.length
+      return text.slice(mk.letterPos, end).trim()
+    })
+    return { question, options }
   }
 
   const parsedQuestion = slide?.questionText ? parseQuestionText(slide.questionText) : null
@@ -290,16 +314,16 @@ export function Presentation() {
 
       {slide?.type === 'round-intro' && (
         <div className="text-center p-8 max-w-[90%]">
-          <p className="text-2xl text-muted-foreground mb-2">Round {slide.roundNumber}</p>
+          <p className="text-4xl font-bold text-primary mb-3 tracking-wide">Round {slide.roundNumber}</p>
           <h1 className="text-6xl font-bold">{slide.roundTitle}</h1>
         </div>
       )}
 
       {slide?.type === 'question' && parsedQuestion && (
         <div className="text-center p-8 max-w-[90%]">
-          <p className="text-base text-muted-foreground mb-8">
+          <p className="text-3xl font-bold text-primary mb-8 tracking-wide">
             Round {slide.roundNumber} · Question {slide.questionNumber}
-            {inReviewMode && ' · Review'}
+            {inReviewMode && <span className="text-orange-500"> · Review</span>}
           </p>
           <div className="text-4xl leading-relaxed whitespace-pre-wrap max-w-[900px] mx-auto text-left font-medium">
             {parsedQuestion.question}
