@@ -7,6 +7,7 @@ import { EventEditor } from './pages/EventEditor'
 import { Presentation } from './pages/Presentation'
 import { PrintView } from './pages/PrintView'
 import { Settings } from './pages/Settings'
+import { Admin } from './pages/Admin'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
 
@@ -19,6 +20,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isAdmin, loading } = useAuth()
+
+  if (loading) {
+    return <div className="loading">Loading...</div>
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>
@@ -113,6 +132,14 @@ function AppRoutes() {
           <ProtectedRoute>
             <Settings />
           </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <AdminRoute>
+            <Admin />
+          </AdminRoute>
         }
       />
     </Routes>

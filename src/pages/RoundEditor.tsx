@@ -3,7 +3,6 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Question } from '../lib/database.types'
-import { triviaPrompt } from '../lib/prompts'
 import { Layout } from '@/components/Layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +25,7 @@ export function RoundEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const { user } = useAuth()
+  const { user, session, canGenerate } = useAuth()
   const isEditing = Boolean(id)
   const returnTo = searchParams.get('returnTo')
 
@@ -152,45 +151,22 @@ export function RoundEditor() {
     setError('')
 
     try {
-      const { data: settings } = await supabase
-        .from('user_settings')
-        .select('claude_api_key')
-        .eq('user_id', user?.id)
-        .single()
-
-      if (!settings?.claude_api_key) {
-        setError('Add your Claude API key in Settings first')
-        setGenerating(false)
-        return
-      }
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': settings.claude_api_key,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true',
+          Authorization: `Bearer ${session?.access_token ?? ''}`,
         },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-6',
-          max_tokens: 2048,
-          messages: [
-            {
-              role: 'user',
-              content: triviaPrompt(topic),
-            },
-          ],
-        }),
+        body: JSON.stringify({ topic }),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error?.message || 'API request failed')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Failed to generate questions')
       }
 
       const data = await response.json()
-      const generatedText = data.content[0]?.text || ''
+      const generatedText = data.text || ''
 
       if (markdownText.trim()) {
         setMarkdownText(markdownText + '\n\n' + generatedText)
@@ -383,14 +359,16 @@ export function RoundEditor() {
             </TabsList>
           </Tabs>
 
-          <Button
-            variant="outline"
-            onClick={generateWithClaude}
-            disabled={generating}
-            className="border-green-300 text-green-700 hover:bg-green-50"
-          >
-            {generating ? 'Generating...' : 'Generate with Claude'}
-          </Button>
+          {canGenerate && (
+            <Button
+              variant="outline"
+              onClick={generateWithClaude}
+              disabled={generating}
+              className="border-green-300 text-green-700 hover:bg-green-50"
+            >
+              {generating ? 'Generating...' : 'Generate with Claude'}
+            </Button>
+          )}
         </div>
 
         {editorMode === 'markdown' ? (

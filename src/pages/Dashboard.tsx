@@ -10,7 +10,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 
 export function Dashboard() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -68,6 +68,9 @@ export function Dashboard() {
       headerActions={
         <>
           <span className="text-sm text-muted-foreground hidden sm:inline">{user?.email}</span>
+          {isAdmin && (
+            <Button variant="outline" onClick={() => navigate('/admin')}>Admin</Button>
+          )}
           <Button variant="outline" onClick={() => navigate('/settings')}>Settings</Button>
           <Button variant="outline" onClick={handleSignOut}>Sign Out</Button>
         </>

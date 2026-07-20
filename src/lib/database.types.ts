@@ -46,6 +46,15 @@ export interface UserSettings {
   updated_at: string
 }
 
+export interface Profile {
+  id: string
+  email: string | null
+  is_admin: boolean
+  can_generate: boolean
+  created_at: string
+  updated_at: string
+}
+
 // Extended types with relations
 export interface RoundWithQuestions extends Round {
   questions: Question[]

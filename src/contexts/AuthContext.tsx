@@ -1,12 +1,17 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
+import type { Profile } from '../lib/database.types'
 
 interface AuthContextType {
   user: User | null
   session: Session | null
+  profile: Profile | null
+  isAdmin: boolean
+  canGenerate: boolean
   loading: boolean
+  refreshProfile: () => Promise<void>
   signInWithGoogle: () => Promise<void>
   signInWithEmail: (email: string, password: string) => Promise<void>
   signUpWithEmail: (email: string, password: string) => Promise<void>
@@ -19,22 +24,42 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
+  const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const loadProfile = useCallback(async (userId: string | undefined) => {
+    if (!userId) {
+      setProfile(null)
+      return
+    }
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single()
+    setProfile((data as Profile) ?? null)
+  }, [])
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+      await loadProfile(session?.user?.id)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
+      loadProfile(session?.user?.id)
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [loadProfile])
+
+  const refreshProfile = useCallback(async () => {
+    await loadProfile(user?.id)
+  }, [loadProfile, user?.id])
 
   const signInWithGoogle = async () => {
     await supabase.auth.signInWithOAuth({
@@ -73,7 +98,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user,
       session,
+      profile,
+      isAdmin: profile?.is_admin ?? false,
+      canGenerate: profile?.can_generate ?? false,
       loading,
+      refreshProfile,
       signInWithGoogle,
       signInWithEmail,
       signUpWithEmail,
