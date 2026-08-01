@@ -2,7 +2,10 @@ export interface Question {
   id: string
   created_at: string
   author_id: string | null
+  /** Plain-text question. When text_html is set, this is its plain-text projection. */
   text: string
+  /** Rich-text question content, or null for plain-text questions. */
+  text_html: string | null
   answer: string
   topic: string | null
 }

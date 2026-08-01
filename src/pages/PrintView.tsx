@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Question, Round } from '../lib/database.types'
+import { questionBlocks, type QuestionBlock } from '../lib/questionContent'
 import { Button } from '@/components/ui/button'
 
 interface RoundWithQuestions {
@@ -9,7 +10,7 @@ interface RoundWithQuestions {
   title: string
   questions: {
     number: number
-    text: string
+    blocks: QuestionBlock[]
     answer: string
   }[]
 }
@@ -60,7 +61,7 @@ export function PrintView() {
             const q = rq.questions as unknown as Question
             return {
               number: rq.position,
-              text: q.text,
+              blocks: questionBlocks(q),
               answer: q.answer,
             }
           }) || []
@@ -109,7 +110,25 @@ export function PrintView() {
           <ol className="list-decimal pl-6 m-0">
             {round.questions.map((q) => (
               <li key={q.number} className="mb-4 pb-4 border-b border-border/50 last:border-b-0 last:mb-0 last:pb-0">
-                <div className="mb-2 whitespace-pre-wrap">{q.text}</div>
+                <div className="mb-2">
+                  {q.blocks.map((block, i) =>
+                    block.type === 'image' ? (
+                      <img
+                        key={i}
+                        src={block.src}
+                        alt={block.alt}
+                        // Deliberately small: this sheet is for grading between
+                        // rounds, so it has to stay compact enough to hold a
+                        // whole round on one page.
+                        className="print-question-image my-1 max-h-24 max-w-full object-contain"
+                      />
+                    ) : (
+                      <div key={i} className="whitespace-pre-wrap">
+                        {block.text}
+                      </div>
+                    )
+                  )}
+                </div>
                 <div className="text-primary font-medium">Answer: {q.answer}</div>
               </li>
             ))}
@@ -146,6 +165,15 @@ export function PrintView() {
           }
           .print-round .whitespace-pre-wrap { margin-bottom: 2pt; }
           .print-round .text-primary { color: #333; font-size: 8pt; }
+          .print-round .print-question-image {
+            max-height: 0.9in;
+            margin: 2pt 0;
+          }
+        }
+        /* Ask the browser to include images; without this most print dialogs
+           drop them and the grading sheet loses half its questions. */
+        @media print {
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
       `}</style>
     </div>

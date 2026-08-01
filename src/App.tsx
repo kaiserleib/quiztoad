@@ -1,8 +1,8 @@
+import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { Login } from './pages/Login'
 import { Dashboard } from './pages/Dashboard'
-import { RoundEditor } from './pages/RoundEditor'
 import { EventEditor } from './pages/EventEditor'
 import { Presentation } from './pages/Presentation'
 import { PrintView } from './pages/PrintView'
@@ -10,6 +10,13 @@ import { Settings } from './pages/Settings'
 import { Admin } from './pages/Admin'
 import { TermsOfService } from './pages/TermsOfService'
 import { PrivacyPolicy } from './pages/PrivacyPolicy'
+
+// The round editor pulls in the rich-text stack, which is most of the app's
+// JavaScript. Splitting it out keeps it off the presentation route — that one
+// loads on venue wifi minutes before a show starts.
+const RoundEditor = lazy(() =>
+  import('./pages/RoundEditor').then((m) => ({ default: m.RoundEditor }))
+)
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -150,7 +157,9 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <Suspense fallback={<div className="loading">Loading...</div>}>
+          <AppRoutes />
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   )

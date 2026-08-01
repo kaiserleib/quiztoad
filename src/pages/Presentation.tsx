@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import type { Question, Round } from '../lib/database.types'
+import { questionBlocks, parseChoices, type QuestionBlock } from '../lib/questionContent'
 
 interface SlideData {
   type: 'cover' | 'round-intro' | 'question'
@@ -10,7 +11,7 @@ interface SlideData {
   roundNumber?: number
   roundTitle?: string
   questionNumber?: number
-  questionText?: string
+  blocks?: QuestionBlock[]
   answer?: string
 }
 
@@ -95,7 +96,7 @@ export function Presentation() {
               type: 'question',
               roundNumber: er.position,
               questionNumber: rq.position,
-              questionText: question.text,
+              blocks: questionBlocks(question),
               answer: question.answer,
             })
             questionCount++
@@ -119,6 +120,20 @@ export function Presentation() {
       loadEvent(id)
     }
   }, [id, navigate])
+
+  // Warm the cache for every image up front. A slide that sits blank while its
+  // image downloads is very visible on a projector, and the venue's wifi is not
+  // something to find out about mid-round.
+  useEffect(() => {
+    for (const slide of slides) {
+      for (const block of slide.blocks ?? []) {
+        if (block.type === 'image') {
+          const img = new window.Image()
+          img.src = block.src
+        }
+      }
+    }
+  }, [slides])
 
   const nextSlide = useCallback(() => {
     const current = slides[currentSlide]
@@ -208,45 +223,6 @@ export function Presentation() {
   const inReviewMode = reviewingRound !== null && slide?.roundNumber === reviewingRound
   const showAnswer = inReviewMode && answerRevealed
 
-  const parseQuestionText = (text: string): { question: string; options: string[] } => {
-    const letters = ['A', 'B', 'C', 'D']
-    type Marker = { letter: string; delim: string; letterPos: number }
-    // Collect candidate option markers: a letter A–D plus ")" or "." delimiter that
-    // sits at a word boundary and is immediately followed by whitespace (or end).
-    const markerRe = /(^|\s)([A-D])([).])(?=\s|$)/g
-    const candidates: Marker[] = []
-    for (let m = markerRe.exec(text); m; m = markerRe.exec(text)) {
-      candidates.push({ letter: m[2], delim: m[3], letterPos: m.index + m[1].length })
-    }
-    // Build the longest A, B, C… run for each delimiter style independently, then
-    // pick the longest. Requiring a real sequence (sharing one delimiter, starting
-    // at A) prevents name initials (e.g. "A. A. Milne", "Arthur C. Clarke") from
-    // being mistaken for multiple-choice options.
-    let seq: Marker[] = []
-    for (const d of [')', '.']) {
-      const run: Marker[] = []
-      for (const c of candidates) {
-        if (c.delim === d && c.letter === letters[run.length]) {
-          run.push(c)
-          if (run.length === letters.length) break
-        }
-      }
-      if (run.length > seq.length) seq = run
-    }
-    // Need at least A and B to count as multiple-choice.
-    if (seq.length < 2) {
-      return { question: text.trim(), options: [] }
-    }
-    const question = text.slice(0, seq[0].letterPos).trim()
-    const options = seq.map((mk, i) => {
-      const end = i + 1 < seq.length ? seq[i + 1].letterPos : text.length
-      return text.slice(mk.letterPos, end).trim()
-    })
-    return { question, options }
-  }
-
-  const parsedQuestion = slide?.questionText ? parseQuestionText(slide.questionText) : null
-
   return (
     <div
       ref={containerRef}
@@ -319,22 +295,44 @@ export function Presentation() {
         </div>
       )}
 
-      {slide?.type === 'question' && parsedQuestion && (
+      {slide?.type === 'question' && slide.blocks && (
         <div className="text-center p-8 max-w-[90%]">
           <p className="text-3xl font-bold text-primary mb-8 tracking-wide">
             Round {slide.roundNumber} · Question {slide.questionNumber}
             {inReviewMode && <span className="text-orange-500"> · Review</span>}
           </p>
-          <div className="text-4xl leading-relaxed whitespace-pre-wrap max-w-[900px] mx-auto text-left font-medium">
-            {parsedQuestion.question}
+          <div className="max-w-[900px] mx-auto">
+            {slide.blocks.map((block, i) => {
+              if (block.type === 'image') {
+                return (
+                  <img
+                    key={i}
+                    src={block.src}
+                    alt={block.alt}
+                    // Capped against the viewport rather than a pixel height so a
+                    // question with a lot of text still fits on one screen.
+                    className="mx-auto my-6 max-h-[45vh] max-w-full object-contain rounded-lg"
+                  />
+                )
+              }
+
+              const { question, options } = parseChoices(block.text)
+              return (
+                <div key={i} className="my-4">
+                  <div className="text-4xl leading-relaxed whitespace-pre-wrap text-left font-medium">
+                    {question}
+                  </div>
+                  {options.length > 0 && (
+                    <div className="mt-6 text-left">
+                      {options.map((option, j) => (
+                        <div key={j} className="text-3xl font-normal leading-relaxed py-1">{option}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
-          {parsedQuestion.options.length > 0 && (
-            <div className="mt-6 text-left max-w-[900px] mx-auto">
-              {parsedQuestion.options.map((option, i) => (
-                <div key={i} className="text-3xl font-normal leading-relaxed py-1">{option}</div>
-              ))}
-            </div>
-          )}
           {showAnswer && (
             <div className="mt-12 text-3xl text-primary">
               <span className="text-muted-foreground">Answer:</span> {slide.answer}
