@@ -372,9 +372,12 @@ export function RoundEditor() {
           navigate(returnTo)
         } else {
           // A fork is a new round as far as the caller is concerned, so it
-          // gets handed back the same way a freshly created one does.
+          // gets handed back the same way a freshly created one does. It also
+          // carries the id it came from, so an event swaps the copy in for the
+          // original rather than ending up listing both.
           const separator = returnTo.includes('?') ? '&' : '?'
-          navigate(`${returnTo}${separator}addRound=${roundId}`)
+          const replaced = forking && id ? `&replaceRound=${id}` : ''
+          navigate(`${returnTo}${separator}addRound=${roundId}${replaced}`)
         }
       } else {
         navigate('/')

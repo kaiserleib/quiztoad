@@ -40,14 +40,16 @@ export function EventEditor() {
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
 
+  /** Returns the insert error, or null on success. */
   const persistRoundToEvent = useCallback(
     async (roundId: string, position: number) => {
-      if (!id) return
-      await supabase.from('event_rounds').insert({
+      if (!id) return null
+      const { error } = await supabase.from('event_rounds').insert({
         event_id: id,
         round_id: roundId,
         position,
       })
+      return error
     },
     [id]
   )
@@ -62,14 +64,51 @@ export function EventEditor() {
       }
 
       const addRoundId = searchParams.get('addRound')
+      // Set when the round editor forked a round it didn't own. The copy takes
+      // the original's place in the running order instead of being appended,
+      // so the event doesn't end up listing both versions.
+      const replaceRoundId = searchParams.get('replaceRound')
+
       if (addRoundId && id && rounds) {
         const roundToAdd = rounds.find((r) => r.id === addRoundId)
         if (roundToAdd && !currentRounds.find((r) => r.id === addRoundId)) {
-          const newRounds = [...currentRounds, roundToAdd]
-          setSelectedRounds(newRounds)
-          await persistRoundToEvent(addRoundId, newRounds.length)
+          const replaceIndex = replaceRoundId
+            ? currentRounds.findIndex((r) => r.id === replaceRoundId)
+            : -1
+
+          // The copy is saved either way by this point, so a failure here
+          // costs the event wiring, not the user's work — say which.
+          const swapFailed = (message: string) =>
+            setError(`Your copy of the round was saved, but adding it to this event failed: ${message}`)
+
+          if (replaceIndex === -1) {
+            const newRounds = [...currentRounds, roundToAdd]
+            const insertError = await persistRoundToEvent(addRoundId, newRounds.length)
+            if (insertError) swapFailed(insertError.message)
+            else setSelectedRounds(newRounds)
+          } else {
+            const newRounds = [...currentRounds]
+            newRounds[replaceIndex] = roundToAdd
+
+            // Delete before insert: event_rounds has unique(event_id, position),
+            // so the original has to vacate the slot before the copy takes it.
+            const { error: dropError } = await supabase
+              .from('event_rounds')
+              .delete()
+              .eq('event_id', id)
+              .eq('round_id', replaceRoundId)
+
+            if (dropError) {
+              swapFailed(dropError.message)
+            } else {
+              const insertError = await persistRoundToEvent(addRoundId, replaceIndex + 1)
+              if (insertError) swapFailed(insertError.message)
+              else setSelectedRounds(newRounds)
+            }
+          }
         }
         searchParams.delete('addRound')
+        searchParams.delete('replaceRound')
         setSearchParams(searchParams, { replace: true })
       }
     }
