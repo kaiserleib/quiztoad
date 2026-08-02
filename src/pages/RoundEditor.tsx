@@ -116,6 +116,13 @@ export function RoundEditor() {
 
   const [title, setTitle] = useState('')
   const [topic, setTopic] = useState('')
+  /**
+   * Author of the round being edited: `undefined` until the round has loaded,
+   * then the author id, or null for a legacy round that has none. The
+   * not-yet-loaded state matters — without it the fork banner flashes on every
+   * edit while the round is still in flight.
+   */
+  const [roundAuthorId, setRoundAuthorId] = useState<string | null | undefined>(undefined)
   const [questions, setQuestions] = useState<QuestionDraft[]>([])
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -135,6 +142,7 @@ export function RoundEditor() {
 
       setTitle(round.title)
       setTopic(round.topic || '')
+      setRoundAuthorId(round.author_id ?? null)
 
       const { data: roundQuestions } = await supabase
         .from('round_questions')
@@ -164,6 +172,15 @@ export function RoundEditor() {
 
     if (id) loadRound(id)
   }, [id])
+
+  /**
+   * Only the round's author may write to `rounds` or `round_questions` under
+   * RLS, so saving someone else's round forks it into a copy of your own —
+   * the same move the question-level fork in handleSave already makes. A
+   * legacy round with no author has nobody who can update it, so it forks too.
+   */
+  const forking =
+    isEditing && roundAuthorId !== undefined && roundAuthorId !== (user?.id ?? null)
 
   const generateWithClaude = async () => {
     if (!topic.trim()) {
@@ -277,13 +294,24 @@ export function RoundEditor() {
     try {
       let roundId = id
 
-      if (isEditing) {
-        await supabase
+      if (isEditing && !forking) {
+        // These are checked because RLS makes a forbidden write look like a
+        // successful no-op rather than an error: it matches zero permitted
+        // rows and reports success. An unchecked update here would silently
+        // discard the edit.
+        const { error: updateError } = await supabase
           .from('rounds')
           .update({ title, topic: topic || null })
           .eq('id', id)
 
-        await supabase.from('round_questions').delete().eq('round_id', id)
+        if (updateError) throw updateError
+
+        const { error: unlinkError } = await supabase
+          .from('round_questions')
+          .delete()
+          .eq('round_id', id)
+
+        if (unlinkError) throw unlinkError
       } else {
         const { data: newRound, error: roundError } = await supabase
           .from('rounds')
@@ -340,9 +368,11 @@ export function RoundEditor() {
       }
 
       if (returnTo) {
-        if (isEditing) {
+        if (isEditing && !forking) {
           navigate(returnTo)
         } else {
+          // A fork is a new round as far as the caller is concerned, so it
+          // gets handed back the same way a freshly created one does.
           const separator = returnTo.includes('?') ? '&' : '?'
           navigate(`${returnTo}${separator}addRound=${roundId}`)
         }
@@ -363,6 +393,15 @@ export function RoundEditor() {
       backTo={returnTo || '/'}
     >
       <div className="space-y-6">
+        {forking && (
+          <Alert>
+            <AlertDescription>
+              This round was written by someone else. Saving creates your own copy —
+              the original is left untouched.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-3">
           <Input
             type="text"
