@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getCaller, serviceClient } from '../_lib/auth'
+// .js extension required — these compile to ESM ("type": "module"), and Node's
+// ESM resolver does not add extensions to relative imports.
+import { getCaller, serviceClient } from '../_lib/auth.js'
 
 async function sendInviteEmail(to: string, link: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY

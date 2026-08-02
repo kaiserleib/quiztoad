@@ -1,5 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getCaller } from './_lib/auth'
+// The .js extension is required, not a typo: package.json sets "type": "module",
+// so these compile to ESM, and Node's ESM resolver does not add extensions to
+// relative imports. Without it the function dies at module load.
+import { getCaller } from './_lib/auth.js'
 
 // Model used for question generation. Trivia generation is a simple task, so
 // swapping this to 'claude-sonnet-5' or 'claude-haiku-4-5' would cut cost with
