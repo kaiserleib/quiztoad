@@ -28,29 +28,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return
   }
 
-  const caller = await getCaller(req)
-  if (!caller) {
-    res.status(401).json({ error: 'Not authenticated' })
-    return
-  }
-  if (!caller.canGenerate) {
-    res.status(403).json({ error: 'You do not have access to Generate with Claude' })
-    return
-  }
-
-  const topic = (req.body?.topic ?? '').toString().trim()
-  if (!topic) {
-    res.status(400).json({ error: 'A topic is required' })
-    return
-  }
-
-  const apiKey = process.env.ANTHROPIC_API_KEY
-  if (!apiKey) {
-    res.status(500).json({ error: 'Generation is not configured on the server' })
-    return
-  }
-
+  // Everything below runs inside the try. getCaller throws outright when the
+  // Supabase server-side env vars are missing, and an uncaught throw here
+  // becomes a Vercel error page rather than JSON — which the client can't
+  // parse, so the user sees a generic failure with no cause.
   try {
+    const caller = await getCaller(req)
+    if (!caller) {
+      res.status(401).json({ error: 'Not authenticated' })
+      return
+    }
+    if (!caller.canGenerate) {
+      res.status(403).json({ error: 'You do not have access to Generate with Claude' })
+      return
+    }
+
+    const topic = (req.body?.topic ?? '').toString().trim()
+    if (!topic) {
+      res.status(400).json({ error: 'A topic is required' })
+      return
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY
+    if (!apiKey) {
+      res.status(500).json({ error: 'Generation is not configured on the server' })
+      return
+    }
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
